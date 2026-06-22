@@ -11,6 +11,8 @@ function M.setup(opts)
   config.setup(opts)
 end
 
+local attaching = {}
+
 --- Attach JDTLS to the current Java buffer.
 --- Called automatically from ftplugin/java.lua or manually.
 function M.attach()
@@ -19,8 +21,26 @@ function M.attach()
   if vim.bo.buftype ~= "" then return end
   if vim.api.nvim_buf_get_name(0) == "" then return end
 
-  local server = require("jdtls-nvim.server")
-  server.start()
+  local bufnr = vim.api.nvim_get_current_buf()
+  if attaching[bufnr] or vim.b[bufnr].jdtls_nvim_attach_started then
+    return
+  end
+  for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr, name = "jdtls" })) do
+    if client.name == "jdtls" then
+      return
+    end
+  end
+
+  attaching[bufnr] = true
+  vim.b[bufnr].jdtls_nvim_attach_started = true
+  local ok, err = pcall(function()
+    require("jdtls-nvim.server").start()
+  end)
+  attaching[bufnr] = nil
+
+  if not ok then
+    vim.notify("[jdtls.nvim] attach failed: " .. tostring(err), vim.log.levels.ERROR)
+  end
 end
 
 --- Get resolved config (read-only).
