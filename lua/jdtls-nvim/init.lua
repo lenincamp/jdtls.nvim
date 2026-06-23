@@ -9,9 +9,32 @@ local config = require("jdtls-nvim.config")
 ---@param opts? jdtls_nvim.UserConfig
 function M.setup(opts)
   config.setup(opts)
+  if vim.g._jdtls_nvim_attach_autocmd then
+    return
+  end
+  vim.g._jdtls_nvim_attach_autocmd = true
+  vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
+    group = vim.api.nvim_create_augroup("JdtlsNvimAttach", { clear = true }),
+    pattern = "java",
+    callback = function()
+      M.attach()
+    end,
+  })
 end
 
 local attaching = {}
+
+-- Clear the per-buffer start flag when jdtls detaches (crash, :LspStop, etc.)
+-- so that the next FileType/ftplugin trigger can reconnect.
+vim.api.nvim_create_autocmd("LspDetach", {
+  group = vim.api.nvim_create_augroup("JdtlsNvimDetach", { clear = true }),
+  callback = function(ev)
+    local client = vim.lsp.get_client_by_id(ev.data.client_id)
+    if client and client.name == "jdtls" then
+      vim.b[ev.buf].jdtls_nvim_attach_started = nil
+    end
+  end,
+})
 
 --- Attach JDTLS to the current Java buffer.
 --- Called automatically from ftplugin/java.lua or manually.
@@ -32,14 +55,17 @@ function M.attach()
   end
 
   attaching[bufnr] = true
-  vim.b[bufnr].jdtls_nvim_attach_started = true
-  local ok, err = pcall(function()
-    require("jdtls-nvim.server").start()
+  local ok, started = pcall(function()
+    return require("jdtls-nvim.server").start()
   end)
   attaching[bufnr] = nil
 
   if not ok then
-    vim.notify("[jdtls.nvim] attach failed: " .. tostring(err), vim.log.levels.ERROR)
+    vim.notify("[jdtls.nvim] attach failed: " .. tostring(started), vim.log.levels.ERROR)
+    return
+  end
+  if started then
+    vim.b[bufnr].jdtls_nvim_attach_started = true
   end
 end
 

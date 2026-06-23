@@ -70,18 +70,19 @@ function M.dap_bundles(mason_base)
 end
 
 --- Start or attach JDTLS to the current buffer.
+---@return boolean started
 function M.start()
   local ok_jdtls, jdtls = pcall(require, "jdtls")
   if not ok_jdtls then
     vim.notify("[jdtls.nvim] nvim-jdtls not found. Install mfussenegger/nvim-jdtls.", vim.log.levels.ERROR)
-    return
+    return false
   end
 
   local cfg = config.get()
 
   -- Find project root
   local root_dir = jdtls.setup.find_root(cfg.root_markers)
-  if root_dir == nil then return end
+  if root_dir == nil then return false end
 
   root_dir = paths.normalize_root(root_dir)
 
@@ -191,6 +192,7 @@ function M.start()
   end
 
   jdtls.start_or_attach(jdtls_config, nil, { reuse_client = reuse_same_root })
+  return true
 end
 
 return M

@@ -4,6 +4,7 @@ package.preload["jdtls-nvim.server"] = function()
   return {
     start = function()
       attach_calls = attach_calls + 1
+      return true
     end,
   }
 end
@@ -22,6 +23,7 @@ describe("jdtls-nvim.attach guard", function()
       return {
         start = function()
           attach_calls = attach_calls + 1
+          return true
         end,
       }
     end
