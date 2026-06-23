@@ -9,6 +9,7 @@ local config = require("jdtls-nvim.config")
 ---@param opts? jdtls_nvim.UserConfig
 function M.setup(opts)
   config.setup(opts)
+  require("jdtls-nvim.folding").setup_restore()
 end
 
 local attaching = {}

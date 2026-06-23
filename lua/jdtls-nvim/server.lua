@@ -170,6 +170,15 @@ function M.start()
         end)
       end
 
+      -- LSP folding (jdtls foldingRange)
+      if cfg.lsp_folding then
+        vim.schedule(function()
+          if not vim.api.nvim_buf_is_valid(bufnr) then return end
+          if vim.bo[bufnr].filetype ~= "java" then return end
+          require("jdtls-nvim.folding").enable(bufnr, client)
+        end)
+      end
+
       -- User on_attach hook
       if cfg.on_attach then
         cfg.on_attach(client, bufnr)
