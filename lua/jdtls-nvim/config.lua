@@ -18,7 +18,6 @@ local M = {}
 ---@field inlay_hints? boolean Enable inlay hints (default: false)
 ---@field organize_imports_on_save? boolean Organize imports on save (default: true)
 ---@field treesitter_indent? boolean Enable treesitter indentation (default: true)
----@field lsp_folding? boolean Enable LSP folding via jdtls (default: true)
 ---@field on_attach? fun(client: vim.lsp.Client, bufnr: integer) Extra on_attach hook
 ---@field capabilities? table Override LSP capabilities
 ---@field workspace_dir? fun(root_dir: string): string Custom workspace dir resolver
@@ -50,7 +49,6 @@ local M = {}
 ---@field inlay_hints boolean
 ---@field organize_imports_on_save boolean
 ---@field treesitter_indent boolean
----@field lsp_folding boolean
 ---@field on_attach? fun(client: vim.lsp.Client, bufnr: integer)
 ---@field capabilities? table
 ---@field workspace_dir? fun(root_dir: string): string
@@ -81,7 +79,6 @@ local defaults = {
   inlay_hints = false,
   organize_imports_on_save = true,
   treesitter_indent = true,
-  lsp_folding = true,
   on_attach = nil,
   capabilities = nil,
   workspace_dir = nil,

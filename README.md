@@ -7,7 +7,7 @@ Opinionated JDTLS configuration for Neovim. Wraps [nvim-jdtls](https://github.co
 - **Zero-config start** — auto-detects project root, Lombok, Mason DAP bundles
 - **DAP integration** — 4 built-in debug configurations + error recovery (auto-retry on `projectName` resolution)
 - **Buffer keymaps** — organize imports, extract variable/method, invert condition, clean workspace
-- **Feature toggles** — semantic tokens, inlay hints, treesitter indent, LSP folding, organize-imports-on-save
+- **Feature toggles** — semantic tokens, inlay hints, treesitter indent, organize-imports-on-save
 - **Project name resolution** — from JDTLS roots, `vim.g`, or filesystem markers
 - **Workspace management** — deterministic workspace dirs with project-name scoping
 
@@ -106,7 +106,6 @@ require("jdtls-nvim").setup({
   inlay_hints = false,
   organize_imports_on_save = true,
   treesitter_indent = true,
-  lsp_folding = true, -- Java only; other buffers keep your global foldexpr
 
   -- Extra hooks
   on_attach = function(client, bufnr)
