@@ -106,7 +106,7 @@ require("jdtls-nvim").setup({
   inlay_hints = false,
   organize_imports_on_save = true,
   treesitter_indent = true,
-  lsp_folding = true,
+  lsp_folding = true, -- Java only; other buffers keep your global foldexpr
 
   -- Extra hooks
   on_attach = function(client, bufnr)
