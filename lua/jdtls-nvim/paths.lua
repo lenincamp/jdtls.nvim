@@ -33,9 +33,24 @@ end
 --- Resolve the platform-specific JDTLS configuration directory.
 ---@return string
 function M.jdtls_config_dir()
-  local sysname = (vim.uv or vim.loop).os_uname().sysname
-  local suffix = sysname == "Darwin" and "mac" or (sysname == "Windows_NT" and "win" or "linux")
+  local uname = (vim.uv or vim.loop).os_uname()
+  local sysname = uname.sysname
+  local machine = uname.machine or ""
+  local suffix
+  if sysname == "Darwin" then
+    suffix = (machine == "arm64" or machine == "aarch64") and "mac_arm" or "mac"
+  elseif sysname == "Windows_NT" then
+    suffix = "win"
+  else
+    suffix = (machine == "aarch64") and "linux_arm" or "linux"
+  end
   local dir = M.mason_base() .. "jdtls/config_" .. suffix
+  -- Fallback to non-arm variant if arm-specific dir is missing
+  if vim.fn.isdirectory(dir) ~= 1 and suffix == "mac_arm" then
+    dir = M.mason_base() .. "jdtls/config_mac"
+  elseif vim.fn.isdirectory(dir) ~= 1 and suffix == "linux_arm" then
+    dir = M.mason_base() .. "jdtls/config_linux"
+  end
   return vim.fn.isdirectory(dir) == 1 and dir or ""
 end
 

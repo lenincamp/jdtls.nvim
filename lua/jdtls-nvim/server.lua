@@ -13,7 +13,8 @@ local paths = require("jdtls-nvim.paths")
 ---@param config_dir? string
 ---@return string[]
 function M.build_cmd(workspace_dir, lombok_jar, jvm_args, java_exec, launcher_jar, config_dir)
-  local use_custom_java = java_exec and java_exec ~= "" and launcher_jar and launcher_jar ~= "" and config_dir and config_dir ~= ""
+  local use_custom_java = java_exec and java_exec ~= "" and launcher_jar and launcher_jar ~= "" and config_dir and
+  config_dir ~= ""
   local cmd = use_custom_java and {
     java_exec,
     "-Declipse.application=org.eclipse.jdt.ls.core.id1",
