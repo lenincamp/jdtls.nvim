@@ -33,6 +33,26 @@ describe("jdtls-nvim.settings", function()
     assert.is_nil(s.java.format.settings.profile)
   end)
 
+  it("passes maven userSettings when configured", function()
+    config.setup({
+      maven_user_settings = function(root_dir)
+        return root_dir .. "/ci-settings-tech-proyecto.xml"
+      end,
+    })
+    local s = settings.build(config.get(), "/tmp/ar-patagonia-cdp")
+    assert.equals("/tmp/ar-patagonia-cdp/ci-settings-tech-proyecto.xml", s.java.configuration.maven.userSettings)
+  end)
+
+  it("passes updateBuildConfiguration and nullAnalysis from config", function()
+    config.setup({
+      update_build_configuration = "automatic",
+      null_analysis_mode = "disabled",
+    })
+    local s = settings.build(config.get(), "/tmp/project")
+    assert.equals("automatic", s.java.configuration.updateBuildConfiguration)
+    assert.equals("disabled", s.java.compile.nullAnalysis.mode)
+  end)
+
   it("passes java_runtimes to configuration.runtimes", function()
     local runtimes = {
       { name = "JavaSE-17", path = "/opt/jdk-17" },

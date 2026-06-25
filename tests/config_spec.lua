@@ -52,9 +52,18 @@ describe("jdtls-nvim.config", function()
 
   it("provides root_markers with sane defaults", function()
     local cfg = config.get()
-    assert.truthy(vim.tbl_contains(cfg.root_markers, "pom.xml"))
-    assert.truthy(vim.tbl_contains(cfg.root_markers, "gradlew"))
     assert.truthy(vim.tbl_contains(cfg.root_markers, ".git"))
+    assert.truthy(vim.tbl_contains(cfg.root_markers, "gradlew"))
+    assert.truthy(vim.tbl_contains(cfg.root_markers, "pom.xml"))
+  end)
+
+  it("accepts root_resolver as a function", function()
+    local resolver = function()
+      return "/tmp/project"
+    end
+    config.setup({ root_resolver = resolver })
+    local cfg = config.get()
+    assert.equals(resolver, cfg.root_resolver)
   end)
 
   it("accepts on_attach as a function", function()

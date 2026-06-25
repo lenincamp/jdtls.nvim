@@ -9,6 +9,7 @@ Opinionated JDTLS configuration for Neovim. Wraps [nvim-jdtls](https://github.co
 - **Buffer keymaps** — organize imports, extract variable/method, invert condition, clean workspace
 - **Feature toggles** — semantic tokens, inlay hints, treesitter indent, organize-imports-on-save
 - **Project name resolution** — from JDTLS roots, `vim.g`, or filesystem markers
+- **Project-specific overrides** — custom root resolver and Maven settings without forking plugin defaults
 - **Workspace management** — deterministic workspace dirs with project-name scoping
 
 ## Requirements
@@ -83,6 +84,25 @@ require("jdtls-nvim").setup({
   -- Project root detection markers
   root_markers = { "mvnw", "gradlew", "pom.xml", "build.gradle", ".git" },
 
+  -- Optional custom root resolver.
+  -- Useful for Maven reactors or monorepos where the nearest pom.xml is not the desired root.
+  root_resolver = function(bufnr, cfg)
+    -- Return an absolute root path, or nil to fall back to root_markers.
+    return nil
+  end,
+
+  -- Maven import settings passed to eclipse.jdt.ls as:
+  -- java.configuration.maven.userSettings
+  maven_user_settings = "/absolute/path/to/settings.xml",
+  -- or:
+  -- maven_user_settings = function(root_dir)
+  --   return root_dir .. "/settings.xml"
+  -- end,
+
+  -- JDTLS build/import preferences
+  update_build_configuration = "interactive", -- "automatic" | "interactive" | "disabled"
+  null_analysis_mode = "automatic",           -- "automatic" | "disabled"
+
   -- DAP (debug adapter protocol) integration
   dap = {
     enabled = true,
@@ -143,6 +163,50 @@ require("jdtls-nvim").setup({
 When set, the plugin derives `<jdtls_java_home>/bin/java` and starts JDTLS with Mason’s Eclipse launcher jar. If the Java executable, launcher jar, or JDTLS config directory cannot be resolved, it falls back to the default `{ "jdtls" }` command.
 
 `jdtls_java_home` does not replace `java_runtimes`; those still describe project JDKs available to Eclipse JDTLS.
+
+## Project Roots And Maven Settings
+
+By default, root detection is generic and uses:
+
+```lua
+root_markers = { "mvnw", "gradlew", "pom.xml", "build.gradle", ".git" }
+```
+
+This works well for normal Maven/Gradle projects because the nearest `pom.xml` or build file becomes the JDTLS root.
+
+For monorepos or Maven reactors, the nearest `pom.xml` can be a child module while the desired JDTLS root is the aggregator. Use `root_resolver` for that case:
+
+```lua
+require("jdtls-nvim").setup({
+  root_resolver = function(bufnr)
+    local path = vim.api.nvim_buf_get_name(bufnr)
+    if path == "" then
+      path = vim.loop.cwd()
+    end
+
+    local git_root = vim.fs.root(path, { ".git" })
+    if git_root and vim.fn.filereadable(git_root .. "/pom.xml") == 1 then
+      return git_root
+    end
+
+    -- nil keeps the plugin default root_markers behavior.
+    return nil
+  end,
+})
+```
+
+Custom Maven settings can be static or derived from the resolved root:
+
+```lua
+require("jdtls-nvim").setup({
+  maven_user_settings = function(root_dir)
+    local settings = root_dir .. "/ci-settings.xml"
+    return vim.fn.filereadable(settings) == 1 and settings or nil
+  end,
+})
+```
+
+This maps to `java.configuration.maven.userSettings`. It affects JDTLS project import and dependency resolution; shell commands still need their own Maven flags or `.mvn/maven.config`.
 
 ## Keymaps
 

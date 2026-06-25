@@ -38,13 +38,38 @@ local FILTERED_TYPES = {
   "sun.*",
 }
 
+--- Resolve Maven userSettings from config and project root.
+---@param cfg jdtls_nvim.Config
+---@param root_dir? string
+---@return string|nil
+local function resolve_maven_user_settings(cfg, root_dir)
+  local value = cfg.maven_user_settings
+  if value == nil then
+    return nil
+  end
+  if type(value) == "function" then
+    return value(root_dir or "")
+  end
+  if type(value) == "string" and value ~= "" then
+    return value
+  end
+  return nil
+end
+
 --- Build JDTLS settings from plugin config.
 ---@param cfg jdtls_nvim.Config
+---@param root_dir? string
 ---@return table
-function M.build(cfg)
+function M.build(cfg, root_dir)
   local exclusions = vim.deepcopy(IMPORT_EXCLUSIONS)
   if cfg.extra_import_exclusions and #cfg.extra_import_exclusions > 0 then
     vim.list_extend(exclusions, cfg.extra_import_exclusions)
+  end
+
+  local maven_user_settings = resolve_maven_user_settings(cfg, root_dir)
+  local configuration_maven = {}
+  if maven_user_settings then
+    configuration_maven.userSettings = maven_user_settings
   end
 
   return {
@@ -64,8 +89,15 @@ function M.build(cfg)
       },
 
       configuration = {
-        updateBuildConfiguration = "interactive",
+        updateBuildConfiguration = cfg.update_build_configuration,
         runtimes = cfg.java_runtimes,
+        maven = configuration_maven,
+      },
+
+      compile = {
+        nullAnalysis = {
+          mode = cfg.null_analysis_mode,
+        },
       },
 
       signatureHelp = { enabled = true, description = { enabled = true } },

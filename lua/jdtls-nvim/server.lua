@@ -82,7 +82,11 @@ function M.start()
   local cfg = config.get()
 
   -- Find project root
-  local root_dir = jdtls.setup.find_root(cfg.root_markers)
+  local root_dir = nil
+  if type(cfg.root_resolver) == "function" then
+    root_dir = cfg.root_resolver(vim.api.nvim_get_current_buf(), cfg)
+  end
+  root_dir = root_dir or jdtls.setup.find_root(cfg.root_markers)
   if root_dir == nil then return false end
 
   root_dir = paths.normalize_root(root_dir)
@@ -124,7 +128,7 @@ function M.start()
   local cmd = M.build_cmd(workspace_dir, lombok_jar, cfg.jvm_args, java_exec, launcher_jar, config_dir)
 
   -- Settings
-  local settings = require("jdtls-nvim.settings").build(cfg)
+  local settings = require("jdtls-nvim.settings").build(cfg, root_dir)
 
   -- JDTLS config
   local jdtls_config = {

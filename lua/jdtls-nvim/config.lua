@@ -10,6 +10,10 @@ local M = {}
 ---@field extra_import_exclusions? string[] Additional import exclusion globs
 ---@field jvm_args? string[] Extra JVM args for JDTLS
 ---@field root_markers? string[] Project root markers
+---@field root_resolver? fun(bufnr: integer, cfg: jdtls_nvim.Config): string? Custom project root resolver
+---@field maven_user_settings? string|fun(root_dir: string): string? Absolute path or resolver for java.configuration.maven.userSettings
+---@field update_build_configuration? string "automatic"|"interactive"|"disabled" for java.configuration.updateBuildConfiguration
+---@field null_analysis_mode? string "automatic"|"disabled" for java.compile.nullAnalysis.mode
 ---@field dap? jdtls_nvim.DapConfig DAP configuration
 ---@field test? jdtls_nvim.TestConfig Test runner configuration
 ---@field keymaps? boolean Enable buffer-local keymaps (default: true)
@@ -41,6 +45,10 @@ local M = {}
 ---@field extra_import_exclusions string[]
 ---@field jvm_args string[]
 ---@field root_markers string[]
+---@field root_resolver? fun(bufnr: integer, cfg: jdtls_nvim.Config): string?
+---@field maven_user_settings? string|fun(root_dir: string): string?
+---@field update_build_configuration string
+---@field null_analysis_mode string
 ---@field dap jdtls_nvim.DapConfig
 ---@field test jdtls_nvim.TestConfig
 ---@field keymaps boolean
@@ -63,6 +71,9 @@ local defaults = {
   extra_import_exclusions = {},
   jvm_args = { "-Xms512m", "-Xmx3G", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+UseStringDeduplication" },
   root_markers = { "mvnw", "gradlew", "pom.xml", "build.gradle", ".git" },
+  root_resolver = nil,
+  update_build_configuration = "interactive",
+  null_analysis_mode = "automatic",
   dap = {
     enabled = true,
     profiles = {},
