@@ -89,6 +89,19 @@ function M.project_name(path_hint)
   return require("jdtls-nvim.project").name(path_hint)
 end
 
+--- Resolve Java context for the current buffer/project.
+---@param bufnr? integer
+---@return table
+function M.context(bufnr)
+  return require("jdtls-nvim.context").get(bufnr)
+end
+
+--- Get the Maven command builder module.
+---@return table
+function M.maven()
+  return require("jdtls-nvim.maven")
+end
+
 --- Get the DAP recovery module (request_with_recovery, normalize_error, is_java_error).
 ---@return table
 function M.dap_recovery()

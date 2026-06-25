@@ -8,20 +8,24 @@ local paths = require("jdtls-nvim.paths")
 ---@param workspace_dir string
 ---@param lombok_jar string
 ---@param jvm_args string[]
+---@param log_protocol? boolean
+---@param log_level? string
 ---@param java_exec? string
 ---@param launcher_jar? string
 ---@param config_dir? string
 ---@return string[]
-function M.build_cmd(workspace_dir, lombok_jar, jvm_args, java_exec, launcher_jar, config_dir)
+function M.build_cmd(workspace_dir, lombok_jar, jvm_args, log_protocol, log_level, java_exec, launcher_jar, config_dir)
   local use_custom_java = java_exec and java_exec ~= "" and launcher_jar and launcher_jar ~= "" and config_dir and
   config_dir ~= ""
+  log_protocol = log_protocol == true
+  log_level = (type(log_level) == "string" and log_level ~= "") and log_level or "WARN"
   local cmd = use_custom_java and {
     java_exec,
     "-Declipse.application=org.eclipse.jdt.ls.core.id1",
     "-Dosgi.bundles.defaultStartLevel=4",
     "-Declipse.product=org.eclipse.jdt.ls.core.product",
-    "-Dlog.protocol=true",
-    "-Dlog.level=ALL",
+    "-Dlog.protocol=" .. tostring(log_protocol),
+    "-Dlog.level=" .. log_level,
   } or { "jdtls" }
 
   for _, arg in ipairs(jvm_args) do
@@ -79,17 +83,18 @@ function M.start()
     return false
   end
 
-  local cfg = config.get()
+  local base_cfg = config.get()
 
   -- Find project root
   local root_dir = nil
-  if type(cfg.root_resolver) == "function" then
-    root_dir = cfg.root_resolver(vim.api.nvim_get_current_buf(), cfg)
+  if type(base_cfg.root_resolver) == "function" then
+    root_dir = base_cfg.root_resolver(vim.api.nvim_get_current_buf(), base_cfg)
   end
-  root_dir = root_dir or jdtls.setup.find_root(cfg.root_markers)
+  root_dir = root_dir or jdtls.setup.find_root(base_cfg.root_markers)
   if root_dir == nil then return false end
 
   root_dir = paths.normalize_root(root_dir)
+  local cfg = config.resolve(root_dir, vim.api.nvim_get_current_buf())
 
   -- Workspace
   local workspace_dir, project_name = paths.workspace_for_root(root_dir, cfg.workspace_dir)
@@ -125,7 +130,16 @@ function M.start()
   local java_exec = paths.java_exec_from_home(cfg.jdtls_java_home)
   local launcher_jar = java_exec ~= "" and paths.jdtls_launcher_jar() or ""
   local config_dir = java_exec ~= "" and paths.jdtls_config_dir() or ""
-  local cmd = M.build_cmd(workspace_dir, lombok_jar, cfg.jvm_args, java_exec, launcher_jar, config_dir)
+  local cmd = M.build_cmd(
+    workspace_dir,
+    lombok_jar,
+    cfg.jvm_args,
+    cfg.jdtls_log_protocol,
+    cfg.jdtls_log_level,
+    java_exec,
+    launcher_jar,
+    config_dir
+  )
 
   -- Settings
   local settings = require("jdtls-nvim.settings").build(cfg, root_dir)

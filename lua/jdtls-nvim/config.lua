@@ -3,15 +3,21 @@ local M = {}
 
 ---@class jdtls_nvim.UserConfig
 ---@field jdtls_java_home? string JDK home used to launch JDTLS and Java DAP helpers
+---@field jdtls_log_protocol? boolean Enable Eclipse JDTLS protocol logging
+---@field jdtls_log_level? string Eclipse JDTLS log level, e.g. "OFF", "WARN", "INFO", "ALL"
 ---@field java_runtimes? table[] JDK runtime entries {name, path, default?}
 ---@field lombok? boolean|string Auto-detect or explicit path
 ---@field style_file? string Eclipse formatter XML path
 ---@field format_profile? string Eclipse formatter profile name
 ---@field extra_import_exclusions? string[] Additional import exclusion globs
 ---@field jvm_args? string[] Extra JVM args for JDTLS
+---@field jenv? jdtls_nvim.JenvConfig Discover JDKs from jenv
 ---@field root_markers? string[] Project root markers
 ---@field root_resolver? fun(bufnr: integer, cfg: jdtls_nvim.Config): string? Custom project root resolver
+---@field project_overrides? fun(root_dir: string, cfg: jdtls_nvim.Config, bufnr?: integer): table? Per-project option overrides
 ---@field maven_user_settings? string|fun(root_dir: string): string? Absolute path or resolver for java.configuration.maven.userSettings
+---@field maven_lifecycle_mappings? string|fun(root_dir: string): string? Absolute path or resolver for java.configuration.maven.lifecycleMappings
+---@field maven? jdtls_nvim.MavenConfig Maven command builder defaults
 ---@field update_build_configuration? string "automatic"|"interactive"|"disabled" for java.configuration.updateBuildConfiguration
 ---@field null_analysis_mode? string "automatic"|"disabled" for java.compile.nullAnalysis.mode
 ---@field dap? jdtls_nvim.DapConfig DAP configuration
@@ -36,17 +42,35 @@ local M = {}
 ---@field send_command? fun(cmd: string) Hook to send test command (e.g., tmux)
 ---@field extra_args? string Additional Maven/Gradle args
 
+---@class jdtls_nvim.JenvConfig
+---@field enabled? boolean Enable jenv discovery (default: false)
+---@field use_java_home? boolean Prefer JAVA_HOME for JDTLS java_home (default: true)
+---@field runtimes? string|number[] "active", "all", or Java majors to expose, e.g. {17, 21} (default: "active")
+
+---@class jdtls_nvim.MavenConfig
+---@field debug? boolean Enable debug-ready Maven tests by default
+---@field debug_port? integer JDWP debug port
+---@field debug_suspend? boolean Suspend JVM until debugger attaches
+---@field retry_without_debug_on_port_busy? boolean Retry without debug when JDWP port is busy
+---@field log_file? string Maven test log file used by retry wrapper
+
 ---@class jdtls_nvim.Config
 ---@field jdtls_java_home string
+---@field jdtls_log_protocol boolean
+---@field jdtls_log_level string
 ---@field java_runtimes table[]
 ---@field lombok boolean|string
 ---@field style_file string
 ---@field format_profile string
 ---@field extra_import_exclusions string[]
 ---@field jvm_args string[]
+---@field jenv jdtls_nvim.JenvConfig
 ---@field root_markers string[]
 ---@field root_resolver? fun(bufnr: integer, cfg: jdtls_nvim.Config): string?
+---@field project_overrides? fun(root_dir: string, cfg: jdtls_nvim.Config, bufnr?: integer): table?
 ---@field maven_user_settings? string|fun(root_dir: string): string?
+---@field maven_lifecycle_mappings? string|fun(root_dir: string): string?
+---@field maven jdtls_nvim.MavenConfig
 ---@field update_build_configuration string
 ---@field null_analysis_mode string
 ---@field dap jdtls_nvim.DapConfig
@@ -64,14 +88,31 @@ local M = {}
 ---@type jdtls_nvim.Config
 local defaults = {
   jdtls_java_home = "",
+  jdtls_log_protocol = false,
+  jdtls_log_level = "WARN",
   java_runtimes = {},
   lombok = true,
   style_file = "",
   format_profile = "",
   extra_import_exclusions = {},
   jvm_args = { "-Xms512m", "-Xmx3G", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200", "-XX:+UseStringDeduplication" },
+  jenv = {
+    enabled = false,
+    use_java_home = true,
+    runtimes = "active",
+  },
   root_markers = { "mvnw", "gradlew", "pom.xml", "build.gradle", ".git" },
   root_resolver = nil,
+  project_overrides = nil,
+  maven_user_settings = nil,
+  maven_lifecycle_mappings = nil,
+  maven = {
+    debug = true,
+    debug_port = 5005,
+    debug_suspend = false,
+    retry_without_debug_on_port_busy = true,
+    log_file = "/tmp/nvim-java-test.log",
+  },
   update_build_configuration = "interactive",
   null_analysis_mode = "automatic",
   dap = {
@@ -107,6 +148,20 @@ end
 ---@return jdtls_nvim.Config
 function M.get()
   return resolved
+end
+
+---@param root_dir? string
+---@param bufnr? integer
+---@return jdtls_nvim.Config
+function M.resolve(root_dir, bufnr)
+  local cfg = vim.deepcopy(resolved)
+  if root_dir and type(cfg.project_overrides) == "function" then
+    local ok, overrides = pcall(cfg.project_overrides, root_dir, vim.deepcopy(cfg), bufnr)
+    if ok and type(overrides) == "table" then
+      cfg = vim.tbl_deep_extend("force", cfg, overrides)
+    end
+  end
+  return require("jdtls-nvim.jenv").apply(cfg)
 end
 
 ---@return jdtls_nvim.Config

@@ -8,18 +8,44 @@ describe("jdtls-nvim.server", function()
     end)
 
     it("uses jdtls fallback when custom java is incomplete", function()
-      local cmd = server.build_cmd("/tmp/ws", "", {}, "/jdk/bin/java", "", "/config")
+      local cmd = server.build_cmd("/tmp/ws", "", {}, false, "WARN", "/jdk/bin/java", "", "/config")
       assert.equals("jdtls", cmd[1])
     end)
 
     it("uses custom java launcher when fully configured", function()
-      local cmd = server.build_cmd("/tmp/ws", "", { "-Xmx2G" }, "/jdk/bin/java", "/jdtls/launcher.jar", "/jdtls/config_mac")
+      local cmd = server.build_cmd(
+        "/tmp/ws",
+        "",
+        { "-Xmx2G" },
+        false,
+        "WARN",
+        "/jdk/bin/java",
+        "/jdtls/launcher.jar",
+        "/jdtls/config_mac"
+      )
       assert.equals("/jdk/bin/java", cmd[1])
       assert.truthy(vim.tbl_contains(cmd, "-jar"))
       assert.truthy(vim.tbl_contains(cmd, "/jdtls/launcher.jar"))
       assert.truthy(vim.tbl_contains(cmd, "-configuration"))
       assert.truthy(vim.tbl_contains(cmd, "/jdtls/config_mac"))
       assert.truthy(vim.tbl_contains(cmd, "-Xmx2G"))
+      assert.truthy(vim.tbl_contains(cmd, "-Dlog.protocol=false"))
+      assert.truthy(vim.tbl_contains(cmd, "-Dlog.level=WARN"))
+    end)
+
+    it("allows verbose JDTLS logging when configured", function()
+      local cmd = server.build_cmd(
+        "/tmp/ws",
+        "",
+        {},
+        true,
+        "ALL",
+        "/jdk/bin/java",
+        "/jdtls/launcher.jar",
+        "/jdtls/config_mac"
+      )
+      assert.truthy(vim.tbl_contains(cmd, "-Dlog.protocol=true"))
+      assert.truthy(vim.tbl_contains(cmd, "-Dlog.level=ALL"))
     end)
 
     it("includes workspace data dir at end", function()
@@ -57,7 +83,7 @@ describe("jdtls-nvim.server", function()
       local tmp = vim.fn.tempname()
       vim.fn.writefile({""}, tmp)
 
-      local cmd = server.build_cmd("/tmp/ws", tmp, {}, "/jdk/bin/java", "/jdtls/launcher.jar", "/jdtls/config_mac")
+      local cmd = server.build_cmd("/tmp/ws", tmp, {}, false, "WARN", "/jdk/bin/java", "/jdtls/launcher.jar", "/jdtls/config_mac")
       assert.truthy(vim.tbl_contains(cmd, "-javaagent:" .. tmp))
 
       vim.fn.delete(tmp)

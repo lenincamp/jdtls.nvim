@@ -9,7 +9,9 @@ Opinionated JDTLS configuration for Neovim. Wraps [nvim-jdtls](https://github.co
 - **Buffer keymaps** — organize imports, extract variable/method, invert condition, clean workspace
 - **Feature toggles** — semantic tokens, inlay hints, treesitter indent, organize-imports-on-save
 - **Project name resolution** — from JDTLS roots, `vim.g`, or filesystem markers
-- **Project-specific overrides** — custom root resolver and Maven settings without forking plugin defaults
+- **jenv integration** — optional JDK discovery from `JAVA_HOME` and `jenv versions`
+- **Project-specific overrides** — custom root resolver, Maven settings, and per-root options without forking plugin defaults
+- **Context API** — expose resolved root, Java home, Maven settings, and module for task runners
 - **Workspace management** — deterministic workspace dirs with project-name scoping
 
 ## Requirements
@@ -67,6 +69,14 @@ require("jdtls-nvim").setup({
     { name = "JavaSE-21", path = "/usr/lib/jvm/java-21", default = true },
   },
 
+  -- Optional jenv discovery.
+  -- Manual jdtls_java_home/java_runtimes still win when provided.
+  jenv = {
+    enabled = false,
+    use_java_home = true, -- prefer JAVA_HOME for launching JDTLS
+    runtimes = "active",  -- "active" | "all" | {17, 21}
+  },
+
   -- Lombok: true = auto-detect from Mason, false = disable, string = explicit path
   lombok = true,
 
@@ -80,6 +90,8 @@ require("jdtls-nvim").setup({
   -- Optional JDK used to launch JDTLS and Java DAP helpers.
   -- Leave empty to use the default `jdtls` launcher and PATH java.
   jdtls_java_home = "",
+  jdtls_log_protocol = false,
+  jdtls_log_level = "WARN",
 
   -- Project root detection markers
   root_markers = { "mvnw", "gradlew", "pom.xml", "build.gradle", ".git" },
@@ -91,6 +103,12 @@ require("jdtls-nvim").setup({
     return nil
   end,
 
+  -- Optional per-root config overlay. Called after root resolution.
+  project_overrides = function(root_dir, cfg, bufnr)
+    -- Return a table merged into the resolved config, or nil for no override.
+    return nil
+  end,
+
   -- Maven import settings passed to eclipse.jdt.ls as:
   -- java.configuration.maven.userSettings
   maven_user_settings = "/absolute/path/to/settings.xml",
@@ -98,6 +116,19 @@ require("jdtls-nvim").setup({
   -- maven_user_settings = function(root_dir)
   --   return root_dir .. "/settings.xml"
   -- end,
+
+  -- Optional m2e lifecycle mapping XML passed as:
+  -- java.configuration.maven.lifecycleMappings
+  maven_lifecycle_mappings = "/absolute/path/to/lifecycle-mapping.xml",
+
+  -- Maven command builder defaults
+  maven = {
+    debug = true,
+    debug_port = 5005,
+    debug_suspend = false,
+    retry_without_debug_on_port_busy = true,
+    log_file = "/tmp/nvim-java-test.log",
+  },
 
   -- JDTLS build/import preferences
   update_build_configuration = "interactive", -- "automatic" | "interactive" | "disabled"
@@ -164,6 +195,35 @@ When set, the plugin derives `<jdtls_java_home>/bin/java` and starts JDTLS with 
 
 `jdtls_java_home` does not replace `java_runtimes`; those still describe project JDKs available to Eclipse JDTLS.
 
+### jenv Integration
+
+When `jenv.enabled = true`, the plugin can derive Java configuration from the current shell environment:
+
+```lua
+require("jdtls-nvim").setup({
+  jenv = {
+    enabled = true,
+    use_java_home = true,
+    runtimes = "active",
+  },
+})
+```
+
+Resolution order:
+
+1. Explicit `jdtls_java_home` wins.
+2. If `use_java_home` is true and `JAVA_HOME` points to a valid JDK, use it to launch JDTLS.
+3. Otherwise use `jenv prefix $(jenv version-name)`.
+4. If `java_runtimes` is empty, build runtimes from `jenv.runtimes`.
+
+`jenv.runtimes` accepts:
+
+- `"active"`: fastest path, exposes only `jenv version-name`.
+- `"all"`: exposes every `jenv versions --bare` entry.
+- `{17, 21}`: exposes the first valid jenv runtime matching each requested Java major.
+
+Use `jenv local <version>` in project roots when different projects need different Java versions. The plugin caches jenv discovery per Neovim session; restart Neovim or call `require("jdtls-nvim.jenv").clear_cache()` after changing jenv versions.
+
 ## Project Roots And Maven Settings
 
 By default, root detection is generic and uses:
@@ -208,6 +268,121 @@ require("jdtls-nvim").setup({
 
 This maps to `java.configuration.maven.userSettings`. It affects JDTLS project import and dependency resolution; shell commands still need their own Maven flags or `.mvn/maven.config`.
 
+For m2e lifecycle issues, provide a lifecycle mapping file:
+
+```lua
+require("jdtls-nvim").setup({
+  maven_lifecycle_mappings = function(root_dir)
+    local mapping = root_dir .. "/.mvn/m2e-lifecycle.xml"
+    return vim.fn.filereadable(mapping) == 1 and mapping or nil
+  end,
+})
+```
+
+For project-specific behavior without changing global defaults, use `project_overrides`:
+
+```lua
+require("jdtls-nvim").setup({
+  project_overrides = function(root_dir)
+    if vim.fn.filereadable(root_dir .. "/ci-settings.xml") ~= 1 then
+      return nil
+    end
+
+    return {
+      maven_user_settings = root_dir .. "/ci-settings.xml",
+      update_build_configuration = "automatic",
+    }
+  end,
+})
+```
+
+## Context API
+
+`context()` exposes resolved settings for task runners:
+
+```lua
+local ctx = require("jdtls-nvim").context(0)
+
+print(ctx.root_dir)
+print(ctx.java_home)
+print(ctx.maven_user_settings)
+print(ctx.maven_module)
+print(ctx.maven_module_dir)
+```
+
+This lets external test/build runners reuse the same root, Java, and Maven settings that JDTLS uses.
+
+## Maven Command Builder
+
+The Maven builder creates shell commands using the same context as JDTLS:
+
+```lua
+local maven = require("jdtls-nvim").maven()
+
+local cmd = maven.test_method("MyTest", "works", {
+  bufnr = 0,
+})
+```
+
+Test commands are debug-ready by default:
+
+```bash
+-Dmaven.surefire.debug="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+```
+
+That opens JDWP on port `5005` without blocking when no debugger is attached. Use suspend mode when you need to attach before test startup:
+
+```lua
+maven.test_method("MyTest", "works", {
+  debug_suspend = true,
+})
+```
+
+Disable debug flags explicitly:
+
+```lua
+maven.test_class("MyTest", {
+  debug = false,
+})
+```
+
+Configure the debug port globally:
+
+```lua
+require("jdtls-nvim").setup({
+  maven = {
+    debug_port = 5010,
+  },
+})
+```
+
+If the debug port is already in use, the generated command detects common JDWP bind errors, prints a warning in the terminal, and retries once without debug:
+
+```text
+[jdtls.nvim] Maven debug port 5005 is busy; retrying without debug.
+```
+
+For Java 8 runtimes the builder uses `address=5005`; for Java 9+ it uses `address=*:5005`.
+
+Available helpers:
+
+```lua
+maven.command({ goal = "test", test = "MyTest#works" })
+maven.test_method("MyTest", "works")
+maven.test_class("MyTest")
+maven.compile({ skip_tests = true })
+maven.package({ skip_tests = true })
+```
+
+Behavior:
+
+- Uses `JAVA_HOME=<ctx.java_home>` when available.
+- Uses `ctx.maven_user_settings` unless `<root>/.mvn/maven.config` exists.
+- Uses `-pl :artifactId -am` when buffer is inside a Maven module.
+- Adds `-Dsurefire.failIfNoSpecifiedTests=false` only for module-scoped commands.
+- Adds `-Dmaven.test.skip=true` for compile/package helpers, not for test helpers.
+- Opens debug port by default for tests, with retry without debug on port bind failure.
+
 ## Keymaps
 
 Default prefix: `<leader>J` (configurable via `keymap_prefix`).
@@ -249,6 +424,8 @@ local jdtls = require("jdtls-nvim")
 jdtls.setup(opts)                  -- configure (before attach)
 jdtls.attach()                     -- attach JDTLS to current buffer
 jdtls.get_config()                 -- read-only resolved config
+jdtls.context(bufnr?)              -- resolved root/java/maven context
+jdtls.maven()                      -- Maven command builder
 jdtls.dap_configurations(bufnr?)   -- DAP profiles for nvim-dap
 jdtls.project_name(path_hint?)     -- resolve Java project name
 jdtls.dap_recovery()               -- DAP error recovery module

@@ -16,9 +16,18 @@ describe("jdtls-nvim.config", function()
     assert.equals(true, cfg.treesitter_indent)
     assert.equals("<leader>J", cfg.keymap_prefix)
     assert.equals("", cfg.jdtls_java_home)
+    assert.equals(false, cfg.jdtls_log_protocol)
+    assert.equals("WARN", cfg.jdtls_log_level)
     assert.equals("maven", cfg.test.runner)
     assert.equals(true, cfg.dap.enabled)
     assert.equals("auto", cfg.dap.hotcodereplace)
+    assert.equals(false, cfg.jenv.enabled)
+    assert.equals(true, cfg.jenv.use_java_home)
+    assert.equals("active", cfg.jenv.runtimes)
+    assert.equals(true, cfg.maven.debug)
+    assert.equals(5005, cfg.maven.debug_port)
+    assert.equals(false, cfg.maven.debug_suspend)
+    assert.equals(true, cfg.maven.retry_without_debug_on_port_busy)
   end)
 
   it("merges user opts with defaults", function()
@@ -66,6 +75,26 @@ describe("jdtls-nvim.config", function()
     assert.equals(resolver, cfg.root_resolver)
   end)
 
+  it("accepts project_overrides as a function", function()
+    local overrides = function()
+      return { update_build_configuration = "automatic" }
+    end
+    config.setup({ project_overrides = overrides })
+    local cfg = config.get()
+    assert.equals(overrides, cfg.project_overrides)
+  end)
+
+  it("resolves project overrides without mutating base config", function()
+    config.setup({
+      update_build_configuration = "interactive",
+      project_overrides = function()
+        return { update_build_configuration = "automatic" }
+      end,
+    })
+    assert.equals("interactive", config.get().update_build_configuration)
+    assert.equals("automatic", config.resolve("/tmp/project").update_build_configuration)
+  end)
+
   it("accepts on_attach as a function", function()
     local called = false
     config.setup({ on_attach = function() called = true end })
@@ -73,5 +102,11 @@ describe("jdtls-nvim.config", function()
     assert.is_function(cfg.on_attach)
     cfg.on_attach({}, 0)
     assert.is_true(called)
+  end)
+
+  it("accepts explicit jenv runtime majors", function()
+    config.setup({ jenv = { enabled = true, runtimes = { 17, 21 } } })
+    local cfg = config.get()
+    assert.same({ 17, 21 }, cfg.jenv.runtimes)
   end)
 end)

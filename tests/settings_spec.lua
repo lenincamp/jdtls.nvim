@@ -43,6 +43,16 @@ describe("jdtls-nvim.settings", function()
     assert.equals("/tmp/ar-patagonia-cdp/ci-settings-tech-proyecto.xml", s.java.configuration.maven.userSettings)
   end)
 
+  it("passes maven lifecycleMappings when configured", function()
+    config.setup({
+      maven_lifecycle_mappings = function(root_dir)
+        return root_dir .. "/.mvn/m2e-lifecycle.xml"
+      end,
+    })
+    local s = settings.build(config.get(), "/tmp/project")
+    assert.equals("/tmp/project/.mvn/m2e-lifecycle.xml", s.java.configuration.maven.lifecycleMappings)
+  end)
+
   it("passes updateBuildConfiguration and nullAnalysis from config", function()
     config.setup({
       update_build_configuration = "automatic",

@@ -38,12 +38,13 @@ local FILTERED_TYPES = {
   "sun.*",
 }
 
---- Resolve Maven userSettings from config and project root.
+--- Resolve path-like settings from config and project root.
 ---@param cfg jdtls_nvim.Config
+---@param key string
 ---@param root_dir? string
 ---@return string|nil
-local function resolve_maven_user_settings(cfg, root_dir)
-  local value = cfg.maven_user_settings
+local function resolve_path_setting(cfg, key, root_dir)
+  local value = cfg[key]
   if value == nil then
     return nil
   end
@@ -66,10 +67,14 @@ function M.build(cfg, root_dir)
     vim.list_extend(exclusions, cfg.extra_import_exclusions)
   end
 
-  local maven_user_settings = resolve_maven_user_settings(cfg, root_dir)
+  local maven_user_settings = resolve_path_setting(cfg, "maven_user_settings", root_dir)
+  local maven_lifecycle_mappings = resolve_path_setting(cfg, "maven_lifecycle_mappings", root_dir)
   local configuration_maven = {}
   if maven_user_settings then
     configuration_maven.userSettings = maven_user_settings
+  end
+  if maven_lifecycle_mappings then
+    configuration_maven.lifecycleMappings = maven_lifecycle_mappings
   end
 
   return {
