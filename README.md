@@ -407,7 +407,7 @@ The plugin provides 4 built-in DAP configurations (via `dap_configurations()`):
 
 ### Error Recovery
 
-When a DAP session errors with "specify projectName", the plugin auto-resolves the project name from JDTLS roots and retries the request. Access via:
+When a DAP session errors with "specify projectName", the plugin auto-resolves the name of the Maven module owning the current file (its `pom.xml` `artifactId`), falling back to the JDTLS root name, and retries the request. This makes debug work in multi-module reactors where the class lives in a submodule (e.g. `api`) rather than the aggregator. Access via:
 
 ```lua
 local recovery = require("jdtls-nvim").dap_recovery()

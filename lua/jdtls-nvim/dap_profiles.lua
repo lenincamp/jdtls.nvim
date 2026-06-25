@@ -64,7 +64,7 @@ end
 ---@param bufnr? number Buffer to resolve project context from
 ---@return table[] configurations
 function M.configurations(bufnr)
-  local project_name = project.name(buffer_path(bufnr))
+  local project_name = project.module_name(buffer_path(bufnr))
   local source_paths = java_source_paths(bufnr)
   local step_filters = java_step_filters()
 

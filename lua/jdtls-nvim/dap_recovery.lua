@@ -40,7 +40,7 @@ local function maybe_set_java_project_name(session)
   local buf_path = vim.api.nvim_buf_get_name(0)
   local hint = frame_source_path or (buf_path ~= "" and buf_path or nil)
 
-  local resolved = project.name(hint)
+  local resolved = project.module_name(hint)
   if not resolved then return false end
   session.config.projectName = resolved
   return true

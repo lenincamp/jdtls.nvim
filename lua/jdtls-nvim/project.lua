@@ -61,6 +61,51 @@ local function cached_basename(root)
   return resolved
 end
 
+local function nearest_pom(path_hint)
+  local start = normalize_path(path_hint)
+  if not start then start = normalize_path(vim.fn.expand("%:p:h")) end
+  if not start then start = normalize_path(vim.fn.getcwd()) end
+  if not start then return nil end
+  return vim.fs.find("pom.xml", { path = start, upward = true })[1]
+end
+
+--- Extract the module's own artifactId from a pom.xml (ignoring <parent>).
+---@param pom_path string
+---@return string|nil artifact_id
+local function pom_artifact_id(pom_path)
+  local ok, lines = pcall(vim.fn.readfile, pom_path)
+  if not ok or type(lines) ~= "table" then return nil end
+  local content = table.concat(lines, "\n")
+  -- Drop the <parent>...</parent> block so we read the project's own artifactId.
+  content = content:gsub("<parent>.-</parent>", "")
+  -- Keep only the project header (coordinates live before deps/build/modules),
+  -- so we never match an artifactId from a dependency or plugin.
+  content = content:match("^(.-)<dependencies")
+    or content:match("^(.-)<dependencyManagement")
+    or content:match("^(.-)<build")
+    or content:match("^(.-)<profiles")
+    or content:match("^(.-)<modules")
+    or content
+  local artifact = content:match("<artifactId>%s*([^<%s][^<]-)%s*</artifactId>")
+  if artifact and artifact ~= "" then return artifact end
+  return nil
+end
+
+--- Resolve the JDTLS/eclipse project name for the Maven module owning a path.
+--- Falls back to M.name when no pom artifactId can be resolved.
+---@param path_hint? string File or directory path to resolve from
+---@return string|nil project_name
+function M.module_name(path_hint)
+  local pom = nearest_pom(path_hint)
+  if pom then
+    local artifact = pom_artifact_id(pom)
+    if artifact then return artifact end
+    local module_root = normalize_path(vim.fs.dirname(pom))
+    if module_root then return cached_basename(module_root) end
+  end
+  return M.name(path_hint)
+end
+
 --- Resolve the Java project name for a given path hint.
 ---@param path_hint? string File or directory path to resolve from
 ---@return string|nil project_name
